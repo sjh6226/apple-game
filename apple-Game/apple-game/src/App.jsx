@@ -14,11 +14,14 @@ import apple9 from './img/9.JPG'
 function App() {
   const GRID_WIDTH = 17
   const GRID_HEIGHT = 10
+  const TOTAL_APPLES = GRID_WIDTH * GRID_HEIGHT // 170개
   const [gameGrid, setGameGrid] = useState([])
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState(null)
   const [dragEnd, setDragEnd] = useState(null)
   const [selectedCells, setSelectedCells] = useState(new Set())
+  const [score, setScore] = useState(0)
+  const [isGameComplete, setIsGameComplete] = useState(false)
 
   const appleImages = [
     apple1, apple2, apple3, apple4, apple5,
@@ -95,29 +98,61 @@ function App() {
         newGrid[row][col] = 0
       })
       setGameGrid(newGrid)
+
+      // 점수 증가 (제거된 사과 개수만큼)
+      const newScore = score + cellsToRemove.length
+      setScore(newScore)
+
+      // 게임 완료 확인 (모든 사과가 제거되었는지)
+      if (newScore >= TOTAL_APPLES) {
+        setIsGameComplete(true)
+      }
     }
   }
 
   // 게임 그리드 초기화
-  useEffect(() => {
-    const initializeGrid = () => {
-      const grid = []
-      for (let row = 0; row < GRID_HEIGHT; row++) {
-        const rowData = []
-        for (let col = 0; col < GRID_WIDTH; col++) {
-          rowData.push(getRandomApple())
-        }
-        grid.push(rowData)
+  const initializeGrid = () => {
+    const grid = []
+    for (let row = 0; row < GRID_HEIGHT; row++) {
+      const rowData = []
+      for (let col = 0; col < GRID_WIDTH; col++) {
+        rowData.push(getRandomApple())
       }
-      setGameGrid(grid)
+      grid.push(rowData)
     }
+    setGameGrid(grid)
+    setScore(0)
+    setIsGameComplete(false)
+  }
 
+  // 게임 재시작
+  const restartGame = () => {
+    initializeGrid()
+  }
+
+  useEffect(() => {
     initializeGrid()
   }, [])
 
   return (
     <div className="game-container">
       <h1>사과 퍼즐 게임</h1>
+      <div className="game-info">
+        <div className="score-display">
+          <span className="score-label">점수: </span>
+          <span className="score-value">{score}</span>
+          <span className="score-total"> / {TOTAL_APPLES}</span>
+        </div>
+        {isGameComplete && (
+          <div className="game-complete">
+            <h2>🎉 게임 완료! 🎉</h2>
+            <p>모든 사과를 성공적으로 제거했습니다!</p>
+            <button className="restart-button" onClick={restartGame}>
+              다시 시작
+            </button>
+          </div>
+        )}
+      </div>
       <p>드래그해서 숫자의 합이 정확히 10이 되는 영역을 만드세요!</p>
       <div className="game-board">
         <div className="canvas-container" onMouseUp={handleMouseUp}>
@@ -129,8 +164,8 @@ function App() {
                   <div
                     key={`${rowIndex}-${colIndex}`}
                     className={`grid-cell ${selectedCells.has(`${rowIndex}-${colIndex}`) ? 'selected' : ''} ${appleNumber === 0 ? 'empty' : ''}`}
-                    onMouseDown={() => handleMouseDown(rowIndex, colIndex)}
-                    onMouseEnter={() => handleMouseEnter(rowIndex, colIndex)}
+                    onMouseDown={() => !isGameComplete && handleMouseDown(rowIndex, colIndex)}
+                    onMouseEnter={() => !isGameComplete && handleMouseEnter(rowIndex, colIndex)}
                   >
                     {appleNumber > 0 && (
                       <img
@@ -147,6 +182,11 @@ function App() {
           </div>
         </div>
       </div>
+      {!isGameComplete && (
+        <button className="restart-button" onClick={restartGame}>
+          게임 재시작
+        </button>
+      )}
     </div>
   )
 }
