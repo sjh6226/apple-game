@@ -15,6 +15,7 @@ function App() {
   const GRID_WIDTH = 17
   const GRID_HEIGHT = 10
   const TOTAL_APPLES = GRID_WIDTH * GRID_HEIGHT // 170개
+  const TIME_LIMIT = 200 // 200초 시간 제한
   const [gameGrid, setGameGrid] = useState([])
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState(null)
@@ -22,6 +23,9 @@ function App() {
   const [selectedCells, setSelectedCells] = useState(new Set())
   const [score, setScore] = useState(0)
   const [isGameComplete, setIsGameComplete] = useState(false)
+  const [timeLeft, setTimeLeft] = useState(TIME_LIMIT)
+  const [isTimeUp, setIsTimeUp] = useState(false)
+  const [gameStarted, setGameStarted] = useState(false)
 
   const appleImages = [
     apple1, apple2, apple3, apple4, apple5,
@@ -33,8 +37,17 @@ function App() {
     return Math.floor(Math.random() * 9) + 1
   }
 
+  // 시간 포맷 함수 (mm:ss 형식)
+  const formatTime = (seconds) => {
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = seconds % 60
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`
+  }
+
   // 드래그 시작
   const handleMouseDown = (row, col) => {
+    if (isTimeUp || isGameComplete) return
+
     setIsDragging(true)
     setDragStart({ row, col })
     setDragEnd({ row, col })
@@ -43,7 +56,7 @@ function App() {
 
   // 드래그 중
   const handleMouseEnter = (row, col) => {
-    if (isDragging) {
+    if (isDragging && !isTimeUp && !isGameComplete) {
       setDragEnd({ row, col })
       updateSelectedCells({ row, col })
     }
@@ -69,7 +82,7 @@ function App() {
 
   // 드래그 종료
   const handleMouseUp = () => {
-    if (isDragging && dragStart && dragEnd) {
+    if (isDragging && dragStart && dragEnd && !isTimeUp && !isGameComplete) {
       checkAndRemoveApples()
     }
     setIsDragging(false)
@@ -106,6 +119,7 @@ function App() {
       // 게임 완료 확인 (모든 사과가 제거되었는지)
       if (newScore >= TOTAL_APPLES) {
         setIsGameComplete(true)
+        setGameStarted(false)
       }
     }
   }
@@ -123,6 +137,9 @@ function App() {
     setGameGrid(grid)
     setScore(0)
     setIsGameComplete(false)
+    setTimeLeft(TIME_LIMIT)
+    setIsTimeUp(false)
+    setGameStarted(true)
   }
 
   // 게임 재시작
@@ -134,26 +151,70 @@ function App() {
     initializeGrid()
   }, [])
 
+  // 시간 카운트다운 타이머
+  useEffect(() => {
+    let timer
+    if (gameStarted && timeLeft > 0 && !isGameComplete && !isTimeUp) {
+      timer = setInterval(() => {
+        setTimeLeft(prevTime => {
+          if (prevTime <= 1) {
+            setIsTimeUp(true)
+            setGameStarted(false)
+            return 0
+          }
+          return prevTime - 1
+        })
+      }, 1000)
+    }
+
+    return () => {
+      if (timer) clearInterval(timer)
+    }
+  }, [gameStarted, timeLeft, isGameComplete, isTimeUp])
+
   return (
     <div className="game-container">
       <h1>사과 퍼즐 게임</h1>
       <div className="game-info">
-        <div className="score-display">
-          <span className="score-label">점수: </span>
-          <span className="score-value">{score}</span>
-          <span className="score-total"> / {TOTAL_APPLES}</span>
+        <div className="game-stats">
+          <div className="score-display">
+            <span className="score-label">점수: </span>
+            <span className="score-value">{score}</span>
+            <span className="score-total"> / {TOTAL_APPLES}</span>
+          </div>
+          <div className={`timer-display ${timeLeft <= 30 ? 'warning' : ''} ${timeLeft <= 10 ? 'danger' : ''}`}>
+            <span className="timer-label">남은 시간: </span>
+            <span className="timer-value">{formatTime(timeLeft)}</span>
+          </div>
         </div>
+
         {isGameComplete && (
           <div className="game-complete">
             <h2>🎉 게임 완료! 🎉</h2>
             <p>모든 사과를 성공적으로 제거했습니다!</p>
+            <p>최종 점수: {score}점</p>
             <button className="restart-button" onClick={restartGame}>
               다시 시작
             </button>
           </div>
         )}
+
+        {isTimeUp && !isGameComplete && (
+          <div className="game-over">
+            <h2>⏰ 시간 종료! ⏰</h2>
+            <p>시간이 다 되었습니다.</p>
+            <p>최종 점수: {score}점</p>
+            <button className="restart-button" onClick={restartGame}>
+              Reset
+            </button>
+          </div>
+        )}
       </div>
-      <p>드래그해서 숫자의 합이 정확히 10이 되는 영역을 만드세요!</p>
+
+      {!isGameComplete && !isTimeUp && (
+        <p>드래그해서 숫자의 합이 정확히 10이 되는 영역을 만드세요!</p>
+      )}
+
       <div className="game-board">
         <div className="canvas-container" onMouseUp={handleMouseUp}>
           <img src={canvasImg} alt="게임 캔버스" className="canvas-background" />
@@ -163,9 +224,9 @@ function App() {
                 {row.map((appleNumber, colIndex) => (
                   <div
                     key={`${rowIndex}-${colIndex}`}
-                    className={`grid-cell ${selectedCells.has(`${rowIndex}-${colIndex}`) ? 'selected' : ''} ${appleNumber === 0 ? 'empty' : ''}`}
-                    onMouseDown={() => !isGameComplete && handleMouseDown(rowIndex, colIndex)}
-                    onMouseEnter={() => !isGameComplete && handleMouseEnter(rowIndex, colIndex)}
+                    className={`grid-cell ${selectedCells.has(`${rowIndex}-${colIndex}`) ? 'selected' : ''} ${appleNumber === 0 ? 'empty' : ''} ${(isTimeUp || isGameComplete) ? 'disabled' : ''}`}
+                    onMouseDown={() => handleMouseDown(rowIndex, colIndex)}
+                    onMouseEnter={() => handleMouseEnter(rowIndex, colIndex)}
                   >
                     {appleNumber > 0 && (
                       <img
@@ -182,7 +243,8 @@ function App() {
           </div>
         </div>
       </div>
-      {!isGameComplete && (
+
+      {!isGameComplete && !isTimeUp && (
         <button className="restart-button" onClick={restartGame}>
           게임 재시작
         </button>
