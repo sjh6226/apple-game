@@ -15,7 +15,7 @@ function App() {
   const GRID_WIDTH = 17
   const GRID_HEIGHT = 10
   const TOTAL_APPLES = GRID_WIDTH * GRID_HEIGHT // 170개
-  const TIME_LIMIT = 200 // 200초 시간 제한
+  const TIME_LIMIT = 120 // 120초 시간 제한
   const [gameGrid, setGameGrid] = useState([])
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState(null)
